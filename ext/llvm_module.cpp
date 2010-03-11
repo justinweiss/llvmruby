@@ -3,6 +3,7 @@
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/System/DynamicLibrary.h"
 #include <fstream>
 #include <sstream>
@@ -17,7 +18,7 @@ llvm_module_allocate(VALUE klass) {
 VALUE
 llvm_module_initialize(VALUE self, VALUE rname) {
   Check_Type(rname, T_STRING);
-  DATA_PTR(self) = new Module(StringValuePtr(rname));
+  DATA_PTR(self) = new Module(StringValuePtr(rname), getGlobalContext());
   return self;
 }
 
@@ -54,7 +55,7 @@ llvm_module_global_constant(VALUE self, VALUE rtype, VALUE rinitializer) {
   Module *m = LLVM_MODULE(self);
   Type *type = LLVM_TYPE(rtype);
   Constant *initializer = (Constant*)DATA_PTR(rinitializer);
-  GlobalVariable *gv = new GlobalVariable(type, true, GlobalValue::InternalLinkage, initializer, "", m);
+  GlobalVariable *gv = new GlobalVariable(getGlobalContext(), type, true, GlobalValue::InternalLinkage, initializer, "", m);
   return llvm_value_wrap(gv);
 }
 
@@ -63,7 +64,7 @@ llvm_module_global_variable(VALUE self, VALUE rtype, VALUE rinitializer) {
   Module *m = LLVM_MODULE(self);
   Type *type = LLVM_TYPE(rtype);
   Constant *initializer = (Constant*)DATA_PTR(rinitializer);
-  GlobalVariable *gv = new GlobalVariable(type, false, GlobalValue::InternalLinkage, initializer, "", m);
+  GlobalVariable *gv = new GlobalVariable(getGlobalContext(), type, false, GlobalValue::InternalLinkage, initializer, "", m);
   return llvm_value_wrap(gv);
 }
 
@@ -151,13 +152,14 @@ llvm_module_external_function(VALUE self, VALUE name, VALUE type) {
 VALUE
 llvm_module_read_assembly(VALUE self, VALUE assembly) {
   Check_Type(assembly, T_STRING);
-
-  ParseError e;
+  SMDiagnostic e;
   Module *module = ParseAssemblyString(
     StringValuePtr(assembly),
     LLVM_MODULE(self),
-    &e
+    e,
+    LLVM_MODULE(self)->getContext()
   );
+
   //TODO How do we handle errors?
   return Data_Wrap_Struct(cLLVMModule, NULL, NULL, module);
 }
@@ -172,7 +174,7 @@ llvm_module_read_bitcode(VALUE self, VALUE bitcode) {
   MemoryBuffer *buf = MemoryBuffer::getMemBufferCopy(RSTRING(bitcode)->ptr,RSTRING(bitcode)->ptr+RSTRING(bitcode)->len);
 #endif
 
-  Module *module = ParseBitcodeFile(buf);
+  Module *module = ParseBitcodeFile(buf, getGlobalContext());
   delete buf;
   return Data_Wrap_Struct(cLLVMModule, NULL, NULL, module);
 }

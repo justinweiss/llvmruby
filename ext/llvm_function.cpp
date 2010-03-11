@@ -9,7 +9,7 @@ llvm_function_wrap(Function *f) {
 
 VALUE 
 llvm_function_create_block(VALUE self) {
-  BasicBlock *bb = BasicBlock::Create("bb", LLVM_FUNCTION(self));
+  BasicBlock *bb = BasicBlock::Create(getGlobalContext(), "bb", LLVM_FUNCTION(self));
   return llvm_basic_block_wrap(bb);
 }
 
